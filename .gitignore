@@ -1,6 +1,10 @@
-/.vscode/
-/build/
-/lua/
-/temp/
-/premake-5/
-/premake5.exe
+# visual studio generated files
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+
+# build output
+bin/
+obj/

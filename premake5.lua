@@ -1,13 +1,16 @@
 project "ocgcore"
     kind "StaticLib"
 
+    targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+    objdir ("obj/" .. outputdir .. "/%{prj.name}")
+
     files { "*.cpp", "*.h" }
-    
-    if BUILD_LUA then
-        includedirs { "../lua/src" }
-    else
-        includedirs { LUA_INCLUDE_DIR }
-    end
+
+    includedirs { "%{IncludeDir.lua}" }
+
+    defines { "_CRT_SECURE_NO_WARNINGS" }
+
+    links { "lua" }
 
     filter "not action:vs*"
         cppdialect "C++14"
@@ -20,3 +23,17 @@ project "ocgcore"
 
     filter "system:linux"
         defines { "LUA_USE_LINUX" }
+
+    filter "configurations:Debug"
+        runtime "Debug"
+        symbols "on"
+
+    filter "configurations:Release"
+        runtime "Release"
+        optimize "speed"
+
+    filter "configurations:Dist"
+        runtime "Release"
+        optimize "speed"
+        symbols "off"
+        vsprops { ["VcpkgConfiguration"] = "Release" }
