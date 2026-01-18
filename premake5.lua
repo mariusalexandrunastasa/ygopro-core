@@ -1,5 +1,7 @@
 project "ocgcore"
     kind "StaticLib"
+    staticruntime "on"
+    cppdialect "C++20"
 
     targetdir ("bin/" .. outputdir .. "/%{prj.name}")
     objdir ("obj/" .. outputdir .. "/%{prj.name}")
@@ -11,9 +13,6 @@ project "ocgcore"
     defines { "_CRT_SECURE_NO_WARNINGS" }
 
     links { "lua" }
-
-    filter "not action:vs*"
-        cppdialect "C++14"
 
     filter "system:bsd"
         defines { "LUA_USE_POSIX" }

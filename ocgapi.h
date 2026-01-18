@@ -16,10 +16,14 @@
 #define EXTERN_C
 #endif
 
+#if defined(OCGCORE_BUILD_AS_DLL)
 #ifdef _WIN32
 #define OCGCORE_API EXTERN_C __declspec(dllexport)
 #else
 #define OCGCORE_API EXTERN_C __attribute__ ((visibility ("default")))
+#endif
+#else
+#define OCGCORE_API extern
 #endif
 
 #define SEED_COUNT	8
