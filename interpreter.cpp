@@ -51,9 +51,9 @@ interpreter::interpreter(duel* pd, bool enable_unsafe_libraries)
 	scriptlib::open_duellib(lua_state);
 	scriptlib::open_debuglib(lua_state);
 	//extra scripts
-	load_script("./script/constant.lua");
-	load_script("./script/utility.lua");
-	load_script("./script/procedure.lua");
+	load_script("constant.lua");
+	load_script("utility.lua");
+	load_script("procedure.lua");
 }
 interpreter::~interpreter() {
 	lua_close(lua_state);
@@ -155,7 +155,7 @@ int32_t interpreter::load_script(const char* script_name) {
 	--no_action;
 	return OPERATION_SUCCESS;
 }
-//push table cxxx onto the stack of current_state 
+//push table cxxx onto the stack of current_state
 int32_t interpreter::load_card_script(uint32_t code) {
 	char class_name[20];
 	interpreter::sprintf(class_name, "c%d", code);
@@ -182,7 +182,7 @@ int32_t interpreter::load_card_script(uint32_t code) {
 			lua_pushinteger(current_state, code);		//+1
 			lua_setglobal(current_state, "self_code");	//-1
 			char script_name[64];
-			interpreter::sprintf(script_name, "./script/c%d.lua", code);
+			interpreter::sprintf(script_name, "c%d.lua", code);
 			res = load_script(script_name);
 			lua_pushnil(current_state);					//+1
 			lua_setglobal(current_state, "self_table"); //-1
