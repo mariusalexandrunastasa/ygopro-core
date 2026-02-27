@@ -8,3 +8,6 @@
 # build output
 bin/
 obj/
+
+# premake generated makefiles
+Makefile
