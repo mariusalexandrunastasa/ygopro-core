@@ -25,9 +25,6 @@
 #else
 #define OCGCORE_API
 #endif
-#else
-#define OCGCORE_API extern
-#endif
 
 #define SEED_COUNT	8
 
