@@ -11,8 +11,8 @@
 #include "group.h"
 #include "effect.h"
 #include "interpreter.h"
-#include <cstring>
 #include <algorithm>
+#include <functional>
 
 int32_t field::field_used_count[32] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5};
 
@@ -48,7 +48,19 @@ void chain::set_triggering_state(card* pcard) {
 	triggering_state.defense = atk_def.second;
 }
 bool tevent::operator< (const tevent& v) const {
-	return std::memcmp(this, &v, sizeof(tevent)) < 0;
+	if(trigger_card != v.trigger_card) return std::less<card*>{}(trigger_card, v.trigger_card);
+	if(event_cards != v.event_cards) return std::less<group*>{}(event_cards, v.event_cards);
+	if(reason_effect != v.reason_effect) return std::less<effect*>{}(reason_effect, v.reason_effect);
+	if(event_code != v.event_code) return event_code < v.event_code;
+	if(event_value != v.event_value) return event_value < v.event_value;
+	if(reason != v.reason) return reason < v.reason;
+	if(event_player != v.event_player) return event_player < v.event_player;
+	return reason_player < v.reason_player;
+}
+bool delayed_effect_sort::operator()(const std::pair<effect*, tevent>& lhs, const std::pair<effect*, tevent>& rhs) const {
+	if(lhs.first != rhs.first)
+		return std::less<effect*>{}(lhs.first, rhs.first);
+	return lhs.second < rhs.second;
 }
 field::field(duel* pd)
 	: pduel(pd) {
@@ -307,7 +319,7 @@ void field::move_card(uint8_t playerid, card* pcard, uint8_t location, uint8_t s
 				}
 				if(preplayer == playerid) {
 					refresh_player_info(playerid);
-					pduel->write_buffer32(pcard->get_info_location());
+					pduel->write_buffer32(pcard->get_public_info_location());
 					pduel->write_buffer32(pcard->current.reason);
 				} else {
 					refresh_player_info(preplayer);
@@ -437,23 +449,23 @@ void field::swap_card(card* pcard1, card* pcard2, uint8_t new_sequence1, uint8_t
 		pduel->write_buffer8(MSG_MOVE);
 		pduel->write_buffer32(pcard1->data.code);
 		pduel->write_buffer32(info1);
-		pduel->write_buffer32(pcard1->get_info_location());
+		pduel->write_buffer32(pcard1->get_public_info_location());
 		pduel->write_buffer32(0);
 		pduel->write_buffer8(MSG_MOVE);
 		pduel->write_buffer32(pcard2->data.code);
 		pduel->write_buffer32(info2);
-		pduel->write_buffer32(pcard2->get_info_location());
+		pduel->write_buffer32(pcard2->get_public_info_location());
 		pduel->write_buffer32(0);
 	} else {
 		pduel->write_buffer8(MSG_MOVE);
 		pduel->write_buffer32(pcard2->data.code);
 		pduel->write_buffer32(info2);
-		pduel->write_buffer32(pcard2->get_info_location());
+		pduel->write_buffer32(pcard2->get_public_info_location());
 		pduel->write_buffer32(0);
 		pduel->write_buffer8(MSG_MOVE);
 		pduel->write_buffer32(pcard1->data.code);
 		pduel->write_buffer32(info1);
-		pduel->write_buffer32(pcard1->get_info_location());
+		pduel->write_buffer32(pcard1->get_public_info_location());
 		pduel->write_buffer32(0);
 	}
 }
@@ -498,13 +510,44 @@ int32_t field::get_pzone_sequence(uint8_t pseq) const {
 			return 7;
 	}
 }
+const card_vector* field::get_field_vector(uint8_t playerid, uint8_t location) const {
+	if (!check_playerid(playerid))
+		return nullptr;
+	switch (location) {
+	case LOCATION_MZONE:
+		return &player[playerid].list_mzone;
+	case LOCATION_SZONE:
+		return &player[playerid].list_szone;
+	case LOCATION_DECK:
+		return &player[playerid].list_main;
+	case LOCATION_HAND:
+		return &player[playerid].list_hand;
+	case LOCATION_GRAVE:
+		return &player[playerid].list_grave;
+	case LOCATION_REMOVED:
+		return &player[playerid].list_remove;
+	case LOCATION_EXTRA:
+		return &player[playerid].list_extra;
+	default:
+		return nullptr;
+	}
+}
 card* field::get_field_card(uint8_t playerid, uint32_t general_location, uint8_t sequence) const {
 	if (!check_playerid(playerid))
 		return nullptr;
 	switch(general_location) {
-	case LOCATION_MZONE: {
-		if(sequence < (int32_t)player[playerid].list_mzone.size())
-			return player[playerid].list_mzone[sequence];
+	case LOCATION_MZONE:
+	case LOCATION_DECK:
+	case LOCATION_HAND:
+	case LOCATION_GRAVE:
+	case LOCATION_REMOVED:
+	case LOCATION_EXTRA: {
+		auto ptr = get_field_vector(playerid, general_location);
+		if (!ptr)
+			return nullptr;
+		auto& container = *ptr;
+		if (sequence < container.size())
+			return container[sequence];
 		else
 			return nullptr;
 		break;
@@ -528,41 +571,6 @@ card* field::get_field_card(uint8_t playerid, uint32_t general_location, uint8_t
 			card* pcard = player[playerid].list_szone[get_pzone_sequence(sequence)];
 			return (pcard && pcard->current.pzone) ? pcard : nullptr;
 		} else
-			return nullptr;
-		break;
-	}
-	case LOCATION_DECK: {
-		if(sequence < player[playerid].list_main.size())
-			return player[playerid].list_main[sequence];
-		else
-			return nullptr;
-		break;
-	}
-	case LOCATION_HAND: {
-		if(sequence < player[playerid].list_hand.size())
-			return player[playerid].list_hand[sequence];
-		else
-			return nullptr;
-		break;
-	}
-	case LOCATION_GRAVE: {
-		if(sequence < player[playerid].list_grave.size())
-			return player[playerid].list_grave[sequence];
-		else
-			return nullptr;
-		break;
-	}
-	case LOCATION_REMOVED: {
-		if(sequence < player[playerid].list_remove.size())
-			return player[playerid].list_remove[sequence];
-		else
-			return nullptr;
-		break;
-	}
-	case LOCATION_EXTRA: {
-		if(sequence < player[playerid].list_extra.size())
-			return player[playerid].list_extra[sequence];
-		else
 			return nullptr;
 		break;
 	}
@@ -2692,7 +2700,7 @@ int32_t field::check_tuner_material(lua_State* L, card* pcard, card* tuner, int3
 				++location_count;
 		}
 		if(min == 0) {
-			if(location_count > 0 && check_with_sum_limit_m(nsyn, lv, 0, 0, 0, 0xffff, 2)) {
+			if(location_count > 0 && must_list.size() == 0 && check_with_sum_limit_m(nsyn, lv, 0, 0, 0, 0xffff, 2)) {
 				pduel->restore_assumes();
 				return TRUE;
 			}
@@ -2704,6 +2712,12 @@ int32_t field::check_tuner_material(lua_State* L, card* pcard, card* tuner, int3
 	}
 	if(must_list.size()) {
 		for(auto& mcard : must_list) {
+			if(mg) {
+				if(!mg->has_card(mcard)) {
+					pduel->restore_assumes();
+					return FALSE;
+				}
+			}
 			if(pcheck)
 				pcheck->get_value(mcard);
 			if((mcard->current.location == LOCATION_MZONE && !mcard->is_position(POS_FACEUP)) || !mcard->is_can_be_synchro_material(pcard, tuner)) {
@@ -3410,7 +3424,7 @@ int32_t field::is_player_can_remove(uint8_t playerid, card* pcard, uint32_t reas
 }
 int32_t field::is_chain_negatable(uint8_t chaincount) {
 	effect_set eset;
-	if(chaincount < 0 || chaincount > core.current_chain.size())
+	if(chaincount > core.current_chain.size())
 		return FALSE;
 	effect* peffect;
 	if(chaincount == 0)
@@ -3429,7 +3443,7 @@ int32_t field::is_chain_negatable(uint8_t chaincount) {
 }
 int32_t field::is_chain_disablable(uint8_t chaincount) {
 	effect_set eset;
-	if(chaincount < 0 || chaincount > core.current_chain.size())
+	if(chaincount > core.current_chain.size())
 		return FALSE;
 	effect* peffect;
 	if(chaincount == 0)
@@ -3449,7 +3463,7 @@ int32_t field::is_chain_disablable(uint8_t chaincount) {
 	return TRUE;
 }
 int32_t field::is_chain_disabled(uint8_t chaincount) {
-	if(chaincount < 0 || chaincount > core.current_chain.size())
+	if(chaincount > core.current_chain.size())
 		return FALSE;
 	chain* pchain;
 	if(chaincount == 0)
@@ -3470,7 +3484,7 @@ int32_t field::is_chain_disabled(uint8_t chaincount) {
 	return FALSE;
 }
 int32_t field::check_chain_target(uint8_t chaincount, card * pcard) {
-	if(chaincount < 0 || chaincount > core.current_chain.size())
+	if(chaincount > core.current_chain.size())
 		return FALSE;
 	chain* pchain;
 	if(chaincount == 0)

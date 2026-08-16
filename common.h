@@ -27,10 +27,18 @@ inline bool check_playerid(int32_t playerid) {
 #define TRUE 1
 #define FALSE 0
 
-#define SIZE_MESSAGE_BUFFER 0x2000
-#define SIZE_RETURN_VALUE 512
-#define SIZE_AI_NAME 128
-#define SIZE_HINT_MSG	1024
+#define SIZE_MESSAGE_BUFFER 0x2000u
+#define SIZE_RETURN_VALUE 256u
+#define SIZE_AI_NAME 128u
+#define SIZE_HINT_MSG	1024u
+
+#define SEED_COUNT	8
+
+#define LEN_FAIL	0
+#define LEN_EMPTY	4
+#define LEN_HEADER	8
+
+#define TEMP_CARD_ID	0
 
 #define PROCESSOR_BUFFER_LEN	0x0fffffff
 #define PROCESSOR_FLAG			0xf0000000
@@ -72,6 +80,7 @@ inline bool check_playerid(int32_t playerid) {
 #define POS_FACEDOWN			0xa
 #define POS_ATTACK				0x3
 #define POS_DEFENSE				0xc
+#define POS_REVEAL				0x80
 //Flip effect flags
 #define NO_FLIP_EFFECT			0x10000
 

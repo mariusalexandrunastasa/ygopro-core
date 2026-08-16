@@ -156,9 +156,9 @@ struct processor_unit {
 	void* ptr3{ nullptr };
 	void* ptr4{ nullptr };
 };
-constexpr int SIZE_SVALUE = SIZE_RETURN_VALUE / 2;
-constexpr int SIZE_IVALUE = SIZE_RETURN_VALUE / 4;
-constexpr int SIZE_LVALUE = SIZE_RETURN_VALUE / 8;
+constexpr size_t SIZE_SVALUE = SIZE_RETURN_VALUE / 2;
+constexpr size_t SIZE_IVALUE = SIZE_RETURN_VALUE / 4;
+constexpr size_t SIZE_LVALUE = SIZE_RETURN_VALUE / 8;
 union return_value {
 	uint8_t bvalue[SIZE_RETURN_VALUE];
 	uint16_t svalue[SIZE_SVALUE];
@@ -173,7 +173,10 @@ using chain_list = std::list<chain>;
 using instant_f_list = std::map<effect*, chain>;
 using chain_array = std::vector<chain>;
 using processor_list = std::list<processor_unit>;
-using delayed_effect_collection = std::set<std::pair<effect*, tevent>>;
+struct delayed_effect_sort {
+	bool operator()(const std::pair<effect*, tevent>& lhs, const std::pair<effect*, tevent>& rhs) const;
+};
+using delayed_effect_collection = std::set<std::pair<effect*, tevent>, delayed_effect_sort>;
 using activity_map = std::unordered_map<int32_t, std::pair<int32_t, uint32_t>>;	// (counter_id, (counter_filter, count[1]|count[0]))
 struct processor {
 	struct chain_limit_t {
@@ -383,6 +386,7 @@ public:
 	void set_control(card* pcard, uint8_t playerid, uint16_t reset_phase, uint8_t reset_count);
 
 	int32_t get_pzone_sequence(uint8_t pseq) const;
+	const card_vector* get_field_vector(uint8_t playerid, uint8_t location) const;
 	card* get_field_card(uint8_t playerid, uint32_t general_location, uint8_t sequence) const;
 	int32_t is_location_useable(uint8_t playerid, uint32_t general_location, uint8_t sequence) const;
 	int32_t get_useable_count(card* pcard, uint8_t playerid, uint8_t location, uint8_t uplayer, uint32_t reason, uint32_t zone = 0xff, uint32_t* list = nullptr);

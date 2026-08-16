@@ -67,13 +67,13 @@ int32_t field::select_battle_command(uint16_t step, uint8_t playerid) {
 			pduel->write_buffer8(0);
 		return FALSE;
 	} else {
-		int32_t t = (uint32_t)returns.ivalue[0] & 0xffff;
-		int32_t s = (uint32_t)returns.ivalue[0] >> 16;
-		if(t < 0 || t > 3 || s < 0
-		        || (t == 0 && s >= (int32_t)core.select_chains.size())
-		        || (t == 1 && s >= (int32_t)core.attackable_cards.size())
-		        || (t == 2 && !core.to_m2)
-		        || (t == 3 && !core.to_ep)) {
+		uint32_t t = (uint32_t)returns.ivalue[0] & 0xffff;
+		uint32_t s = (uint32_t)returns.ivalue[0] >> 16;
+		if(t > 3
+			|| (t == 0 && s >= core.select_chains.size())
+			|| (t == 1 && s >= core.attackable_cards.size())
+			|| (t == 2 && !core.to_m2)
+			|| (t == 3 && !core.to_ep)) {
 			pduel->write_buffer8(MSG_RETRY);
 			return FALSE;
 		}
@@ -154,18 +154,18 @@ int32_t field::select_idle_command(uint16_t step, uint8_t playerid) {
 			pduel->write_buffer8(0);
 		return FALSE;
 	} else {
-		int32_t t = (uint32_t)returns.ivalue[0] & 0xffff;
-		int32_t s = (uint32_t)returns.ivalue[0] >> 16;
-		if(t < 0 || t > 8 || s < 0
-		        || (t == 0 && s >= (int32_t)core.summonable_cards.size())
-		        || (t == 1 && s >= (int32_t)core.spsummonable_cards.size())
-		        || (t == 2 && s >= (int32_t)core.repositionable_cards.size())
-		        || (t == 3 && s >= (int32_t)core.msetable_cards.size())
-		        || (t == 4 && s >= (int32_t)core.ssetable_cards.size())
-		        || (t == 5 && s >= (int32_t)core.select_chains.size())
-		        || (t == 6 && (infos.phase != PHASE_MAIN1 || !core.to_bp))
-		        || (t == 7 && !core.to_ep)
-		        || (t == 8 && !(infos.can_shuffle && (int32_t)player[playerid].list_hand.size() > 1))) {
+		uint32_t t = (uint32_t)returns.ivalue[0] & 0xffff;
+		uint32_t s = (uint32_t)returns.ivalue[0] >> 16;
+		if(t > 8
+			|| (t == 0 && s >= core.summonable_cards.size())
+			|| (t == 1 && s >= core.spsummonable_cards.size())
+			|| (t == 2 && s >= core.repositionable_cards.size())
+			|| (t == 3 && s >= core.msetable_cards.size())
+			|| (t == 4 && s >= core.ssetable_cards.size())
+			|| (t == 5 && s >= core.select_chains.size())
+			|| (t == 6 && (infos.phase != PHASE_MAIN1 || !core.to_bp))
+			|| (t == 7 && !core.to_ep)
+			|| (t == 8 && !(infos.can_shuffle && player[playerid].list_hand.size() > 1))) {
 			pduel->write_buffer8(MSG_RETRY);
 			return FALSE;
 		}
@@ -341,6 +341,9 @@ int32_t field::select_chain(uint16_t step, uint8_t playerid, uint8_t spe_count) 
 				for(const auto& ch : core.current_chain)
 					if(ch.triggering_player == 1)
 						act = false;
+				for(const auto& ch : core.select_chains)
+					if(ch.flag & CHAIN_FORCED)
+						act = true;
 				if(act)
 					returns.ivalue[0] = 0;
 				else
@@ -865,7 +868,9 @@ int32_t field::announce_attribute(int16_t step, uint8_t playerid, int32_t count,
 	}
 	return TRUE;
 }
-static int32_t is_declarable(card_data const& cd, const std::vector<uint32_t>& opcode) {
+static int32_t is_declarable(const card_data& cd, const std::vector<uint32_t>& opcode) {
+	if (cd.alias)
+		return FALSE;
 	std::stack<int32_t> stack;
 	for(auto& it : opcode) {
 		switch(it) {
@@ -905,7 +910,7 @@ static int32_t is_declarable(card_data const& cd, const std::vector<uint32_t>& o
 				stack.pop();
 				int32_t lhs = stack.top();
 				stack.pop();
-				stack.push(lhs / rhs);
+				stack.push(rhs != 0 ? lhs / rhs : 0);
 			}
 			break;
 		}
@@ -994,8 +999,9 @@ static int32_t is_declarable(card_data const& cd, const std::vector<uint32_t>& o
 	}
 	if(stack.size() != 1 || stack.top() == 0)
 		return FALSE;
-	return cd.code == CARD_MARINE_DOLPHIN || cd.code == CARD_TWINKLE_MOSS
-		|| (!cd.alias && (cd.type & (TYPE_MONSTER | TYPE_TOKEN)) != (TYPE_MONSTER | TYPE_TOKEN));
+	if (!second_code.count(cd.code) && (cd.rule_code || (cd.type & TYPE_TOKEN)))
+		return FALSE;
+	return TRUE;
 }
 int32_t field::announce_card(int16_t step, uint8_t playerid) {
 	if(step == 0) {
